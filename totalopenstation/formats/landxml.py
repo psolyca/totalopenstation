@@ -382,6 +382,14 @@ class LandXML:
         tree = xml.ElementTree(xml.fromstring(TEMPLATE))
         self.root = tree.getroot()
 
+    def open(self, filename):
+        """
+        Open a LandXML file
+        :return:
+        """
+        # TODO Open the file and analyse it
+        pass
+
     def append(self, xml_data):
         self.root.append(xml_data)
 

@@ -23,6 +23,7 @@ import logging
  
 from . import Feature, Parser, Point, UNKNOWN_STATION, UNKNOWN_POINT
 from .polar import BasePoint, PolarPoint
+from totalopenstation.formats.landxml import Survey
 
 # Distance units depend of the last digit
 # 0, 6 and 8 are in mm, 1/10mm and 1/100mm
@@ -41,7 +42,7 @@ class FormatParser(Parser):
 
     Args:
         data (str): A string representing the file to be parsed.
-            
+
     Attributes:
         line (list): A list of each lines of the file being parsed.
     '''
@@ -52,7 +53,7 @@ class FormatParser(Parser):
     def _get_comments(self):
         """
         Get all comments of the parsed line
-        
+
         Returns:
             A list of comments or an empty list
         """
@@ -68,7 +69,7 @@ class FormatParser(Parser):
     def _get_attrib(self):
         """
         Get all attributes or remarks of the parsed line
-        
+
         Returns:
             A list of attributes and remarks or an empty list
         """
@@ -84,7 +85,7 @@ class FormatParser(Parser):
     def _get_coordinates(self, first_coor, unit):
         """
         Get all coordinates of the parsed line
-        
+
         Args:
             first_coor (str): The Word Index of the first coordinate.
                 Could be 81 or 84
@@ -114,11 +115,11 @@ class FormatParser(Parser):
     def _get_angle(self, angle, unit):
         """
         Get an angle of the parsed line
-        
+
         Returns:
             A floating number representing the angle
             If this angle does not exist, return None
-            
+
         """
         try:
             angle_sign, angle_data = self.tdict[angle]['sign'], self.tdict[angle]['data']
@@ -132,7 +133,7 @@ class FormatParser(Parser):
     def _get_edm_accuracy(self, ldata):
         """
         Get the ppm and the prism constant of the parsed line
-        
+
         Returns:
             Two floating numbers representing ppm and prism constant
             If these values do not exist, return None
@@ -159,7 +160,7 @@ class FormatParser(Parser):
     def _get_value(self, value, unit):
         """
         Get a value of the parsed line
-        
+
         Returns:
             A string value or None
         """
@@ -177,15 +178,15 @@ class FormatParser(Parser):
         '''Extract all GSI data.
 
         This parser is based on the information in :ref:`if_leica_gsi`
-        
+
         Returns:
             A list of GeoJSON-like Feature object representing points coordinates.
-    
+
         Raises:
-            KeyError: An error occured during line read, this line could not be 
+            KeyError: An error occured during line read, this line could not be
                 computed as the WI does not exist.
             KeyError: An error occured during computation, the data does not exist.
-        
+
         Notes:
             Information needed are:
                 - station : 11, 84, 85, 86, 88
@@ -193,8 +194,8 @@ class FormatParser(Parser):
                 - computed point : 11, 21, 22, 31 or 32, 87 [, 88] [, 81, 82, 83]
             Angles are considered as zenithal
         '''
-        
-        points = []
+
+        root = Survey()
         bp = None
         for row in self.rows:
             tokens = row.split()
@@ -260,13 +261,12 @@ class FormatParser(Parser):
                             x, y, z = self._get_coordinates("84", UNITS[dist_unit])
                             ih = self._get_value("88", UNITS[dist_unit])
                             bp = BasePoint(x=x, y=y, z=z, ih=ih, b_zero_st=0.0)
-                            p = Point(x, y, z)
-                            f = Feature(p,
-                                        desc='ST',
-                                        id=pid,
-                                        point_name=text,
-                                        dist_unit=dist_unit)
-                            points.append(f)
+                            root.cg_point(point_name=text,
+                                          pid=pid,
+                                          x=x,
+                                          y=y,
+                                          z=z,
+                                          attrib=["Station"])
                     else:
                         angle = self._get_angle("21", UNITS[angle_unit])
                         z_angle = self._get_angle("22", UNITS[angle_unit])
@@ -294,37 +294,39 @@ class FormatParser(Parser):
                                        pid=pid,
                                        text=text,
                                        coordorder='ENZ')
-                        f = Feature(p.to_point(),
-                                    desc='PT',
-                                    id=pid,
-                                    point_name=text)
-                        points.append(f)
+                        point = p.to_point()
+                        root.cg_point(point_name=text,
+                                      pid=pid,
+                                      x=point.x,
+                                      y=point.y,
+                                      z=point.z,
+                                      attrib=["Point"])
                 else:
                     x, y, z = self._get_coordinates("81", UNITS[dist_unit])
-                    p = Point(x, y, z)
-                    f = Feature(p,
-                                desc='PT',
-                                id=pid,
-                                point_name=text)
-                    points.append(f)
-        logger.debug(points)
-        return points
+                    root.cg_point(point_name=text,
+                                  pid=pid,
+                                  x=x,
+                                  y=y,
+                                  z=z,
+                                  attrib=["Point"])
+        logger.debug(root)
+        return root
 
     @property
     def raw_line(self):
         '''Extract all GSI data.
 
         This parser is based on the information in :ref:`if_leica_gsi`
-        
+
         Returns:
             A list of GeoJSON-like Feature object representing raw data
                 i.e. polar coordinates and other informations.
-    
+
         Raises:
-            KeyError: An error occured during line read, this line could not be 
+            KeyError: An error occured during line read, this line could not be
                 computed as the WI does not exist.
             KeyError: An error occured during computation, the data does not exist.
-        
+
         Notes:
             Information needed are:
                 - station : 11 [, 25], 84, 85, 86 [, 87], 88
@@ -335,6 +337,7 @@ class FormatParser(Parser):
 
         points = []
         # GSI files handles 8 or 16 bits data block. This will check the size
+        root = Survey()
         ldata = len(self.rows[0].split()[0].lstrip('*')[7:])
         station_id = 1
 
@@ -348,7 +351,7 @@ class FormatParser(Parser):
                     'info': t[2:6],
                     'sign': t[6],
                     'data': t[7:],
-                }
+                    }
                 self.tdict[data['wordindex']] = data
 
             try:
@@ -417,19 +420,14 @@ class FormatParser(Parser):
                             x, y, z = self._get_coordinates("81", UNITS[dist_unit])
                             # Point coordinates may have remarks or attributes
                             attrib = self._get_attrib()
-
-                            if x:
-                                p = Point(x, y, z)
-                            else:
+                            if x is None:
                                 logger.info('There is no known point')
-                                p = UNKNOWN_POINT
-                            f = Feature(p,
-                                        desc='PT',
-                                        id=pid,
-                                        point_name=point_name,
-                                        dist_unit=dist_unit,
-                                        attrib=attrib)
-                            points.append(f)
+                                x, y, z = UNKNOWN_POINT
+                            root.cg_point(point_name=point_name,
+                                           pid=pid,
+                                           x=x,
+                                           y=y,
+                                           z=z)
                     else:
                         # Compute polar data
                         angle = self._get_angle("21", UNITS[angle_unit])
@@ -441,44 +439,39 @@ class FormatParser(Parser):
                             dist = self._get_value("32", UNITS[dist_unit])
                         th = self._get_value("87", UNITS[dist_unit])
                         # Polar data may have point coordinates
-                        x, y, z = self._get_coordinates("81",UNITS[dist_unit])
+                        x, y, z = self._get_coordinates("81", UNITS[dist_unit])
                         # Polar data may have instrument height
                         ih = self._get_value("88", UNITS[dist_unit])
                         # Polar data may have constant data
                         ppm, prism_constant = self._get_edm_accuracy(ldata)
                         # Polar data may have remarks or attributes
                         attrib = self._get_attrib()
-
-                        if x:
-                            p = Point(x, y, z)
-                        else:
+                        if x is None:
                             logger.info('There is no known point')
-                            p = UNKNOWN_POINT
-
+                            x, y, z = UNKNOWN_POINT
                         try:
                             station_name
                         except UnboundLocalError:
                             logger.info('There is no known station')
                             station_name = 'station_' + str(station_id)
                             station_id += 1
-                        f = Feature(p,
-                                    desc='PO',
-                                    id=pid,
-                                    point_name=point_name,
-                                    angle_unit=angle_unit,
-                                    z_angle_type=z_angle_type,
-                                    dist_unit=dist_unit,
-                                    dist_type=dist_type,
-                                    angle=angle,
-                                    z_angle=z_angle,
-                                    dist=dist,
-                                    th=th,
-                                    ih=ih,
-                                    ppm=ppm,
-                                    prism_constant=prism_constant,
-                                    st_name=station_name,
-                                    attrib=attrib)
-                        points.append(f)
+                        root.raw_observation(pid=pid,
+                                              point_name=point_name,
+                                              angle_unit=angle_unit,
+                                              z_angle_type=z_angle_type,
+                                              dist_unit=dist_unit,
+                                              dist_type=dist_type,
+                                              angle=angle,
+                                              z_angle=z_angle,
+                                              dist=dist,
+                                              th=th,
+                                              ih=ih,
+                                              ppm=ppm,
+                                              prism_constant=prism_constant,
+                                              x=x,
+                                              y=y,
+                                              z=z,
+                                              attrib=attrib)
                 else:
                     # Compute station data
                     x, y, z = self._get_coordinates("84", UNITS[dist_unit])
@@ -487,25 +480,25 @@ class FormatParser(Parser):
                     hz0 = self._get_angle("25", UNITS[angle_unit])
                     # Station data may have remarks or attributes
                     attrib = self._get_attrib()
-
                     if x:
-                        p = Point(x, y, z)
                         station_name = point_name
                     else:
                         logger.info('There is no known station')
-                        p = UNKNOWN_STATION
+                        x, y, z = UNKNOWN_STATION
                         station_name = "station_" + str(station_id)
+                    try:
+                        station_name
+                    except UnboundLocalError:
+                        station_name = 'station_' + str(station_id)
                         station_id += 1
-                    f = Feature(p,
-                                desc='ST',
-                                id=pid,
-                                point_name=point_name,
-                                angle_unit=angle_unit,
-                                dist_unit=dist_unit,
-                                ih=ih,
-                                hz0=hz0,
-                                attrib=attrib)
-                    points.append(f)
+                    root.setup(pid=pid,
+                                 point_name=point_name,
+                                 ih=ih,
+                                 hz0=hz0,
+                                 instru_x=x,
+                                 instru_y=y,
+                                 instru_z=z,
+                                 attrib=attrib)
 
-        logger.debug(points)
-        return points
+        logger.debug(root)
+        return root
