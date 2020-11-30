@@ -21,6 +21,8 @@
 
 import logging
  
+import re
+
 from . import Feature, Parser, Point, UNKNOWN_STATION, UNKNOWN_POINT
 from .polar import BasePoint, PolarPoint
 
@@ -33,6 +35,14 @@ UNITS = {"angle": {'21', '22', '25'},
          "0": "meter", "1": "feet", "6": "dmeter", "7": "dfeet", "8": "mmeter",
          "gon": 100000, "deg": 100000, "dms": 100000, "mil": 10000,
          "meter": 1000, "feet": 1000, "dmeter": 10000, "dfeet": 10000, "mmeter": 100000}
+
+# Regex must be in a certain order [ ms, st, pt, cm]
+RE = [
+    re.compile(r"^(?=11(?P<pid>\d{4}).{1}(?P<name>.{8}))(?=.* 21.{3}(?P<hau>\d{1})(?P<has>.{1})(?P<ha>\d{8}))(?=.* 22.{3}(?P<vau>\d{1})(?P<vas>.{1})(?P<va>\d{8}))(?=.* 31.{3}(?P<sdu>\d{1})(?P<sds>.{1})(?P<sd>\d{8})|.*)(?=.* 32.{3}(?P<hdu>\d{1})(?P<hds>.{1})(?P<hd>\d{8})|.*)(?=.* 51.{4}(?P<ppms>.{1})(?P<ppm>\d{4})(?P<prisms>.{1})(?P<prism>\d{3}))(?=. *87.{3}(?P<hru>\d{1})(?P<hrs>.{1})(?P<hr>\d{8}))(?=.* 88.{3}(?P<hiu>\d{1})(?P<his>.{1})(?P<hi>\d{8})|.*)(?=.* 81.{3}(?P<eu>\d{1})(?P<es>.{1})(?P<est>\d{8})|.*)(?=.* 82.{3}(?P<nu>\d{1})(?P<ns>.{1})(?P<north>\d{8})|.*)(?=.* 83.{3}(?P<hu>\d{1})(?P<hs>.{1})(?P<elevation>\d{8})|.*)(?=.* 71.{5}(?P<attrib>.{8})|.*).*"),
+    re.compile(r"^(?=11(?P<pid>\d{4}).{1}(?P<name>.{8}))(?=.* 25.{3}(?P<hz0u>\d{1})(?P<hz0s>.{1})(?P<hz0>\d{8}))(?=.* 87.{3}(?P<hru>\d{1})(?P<hrs>.{1})(?P<hr>\d{8}))(?=.* 88.{3}(?P<hiu>\d{1})(?P<his>.{1})(?P<hi>\d{8})|.*)(?=.* 84.{3}(?P<eou>\d{1})(?P<eos>.{1})(?P<est>\d{8})|.*)(?=.* 85.{3}(?P<nou>\d{1})(?P<nos>.{1})(?P<north>\d{8})|.*)(?=.* 86.{3}(?P<hou>\d{1})(?P<hos>.{1})(?P<height>\d{8})|.*)(?=.* 71.{5}(?P<attrib>.{8})|.*).*"),
+    re.compile(r"^(?=11(?P<pid>\d{4}).{1}(?P<name>.{8}))(?=.* 81.{3}(?P<eu>\d{1})(?P<es>.{1})(?P<est>\d{8})|.*)(?=.* 82.{3}(?P<nu>\d{1})(?P<ns>.{1})(?P<north>\d{8})|.*)(?=.* 83.{3}(?P<hu>\d{1})(?P<hs>.{1})(?P<elevation>\d{8})|.*)(?=.* 71.{5}(?P<attrib>.{8})|.*).*"),
+    re.compile(r"^(?=41.{5}(?P<req1>.{8})|.*)(?=.* 42.{5}(?P<req2>.{8})|.*)(?=.* 43.{5}(?P<req3>.{8})|.*)(?=.* 44.{5}(?P<req4>.{8})|.*)(?=.* 45.{5}(?P<req5>.{8})|.*)(?=.* 46.{5}(?P<req6>.{8})|.*)(?=.* 47.{5}(?P<req7>.{8})|.*)(?=.* 48.{5}(?P<req8>.{8})|.*)(?=.* 49.{5}(?P<req9>.{8})|.*).*"),
+}
 
 logger = logging.getLogger(__name__)
 
@@ -327,18 +337,35 @@ class FormatParser(Parser):
 
         Notes:
             Information needed are:
-                - station : 11 [, 25], 84, 85, 86 [, 87], 88
-                - direct point : 11, 81, 82, 83
-                - computed point : 11, 21, 22, 31 or 32 [, 51], 87 [, 88] [, 81, 82, 83]
+                - station : 11 [, 25], 84, 85, 86 [, 87], 88 [, 71]
+                - direct point : 11, 81, 82, 83 [, 71]
+                - measurement : 11, 21, 22, 31 or 32 [, 51], 87 [, 88] [, 81, 82, 83] [, 71]
+                - comments : 41 [, 42 [, 43 [, 44 [, 45 [, [46 [, 47[ , 48]]]]]]]]
             Angles are considered as zenithal
         '''
 
         points = []
+        data_type = {
+            'ms' : ['11', '21', '22', '51', '87', '88'],
+            'st' : ['11', '25', '84', '85', '86', '88'],
+            'pt' : ['11', '81', '82', '83'],
+            'cm' : ['41']
+        }
+
+
         # GSI files handles 8 or 16 bits data block. This will check the size
         ldata = len(self.rows[0].split()[0].lstrip('*')[7:])
         station_id = 1
 
         for row in self.rows:
+            for key, pattern in RE.items():
+                result = pattern.match(row)
+                if result is not None:
+                    break
+        
+            print(result)
+
+'''
             tokens = row.split()
             self.tdict = {}
             for t in tokens:
@@ -509,3 +536,4 @@ class FormatParser(Parser):
 
         logger.debug(points)
         return points, {"dist_unit": dist_unit, "angle_unit": angle_unit}
+'''
