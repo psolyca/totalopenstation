@@ -428,4 +428,4 @@ class FormatParser:
                 pid += 1
 
         logger.debug(points)
-        return points
+        return points, {"dist_unit": dist_unit, "angle_unit": angle_unit}

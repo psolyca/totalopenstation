@@ -68,7 +68,7 @@ class FormatParser:
         pid = 0
         st = 0
         cocircle = coih = False
-        
+
         for row in self.rows:
             fs = row.split(',')
             # Get angle and distance units
@@ -270,7 +270,7 @@ class FormatParser:
                 - backsight : Control point record
                 - direct point : Uploaded point or Manually input point or Calculated coordinate or Resection point
                 - computed point : Sideshot, Stakeout, Face 1 or 2
-  		  
+
            Sometimes needed records are commented so it is needed to parse also comments like
                 - coordinates order
                 - units
@@ -481,4 +481,4 @@ class FormatParser:
                 points.append(f)
                 pid += 1
         logger.debug(points)
-        return points
+        return points, {"dist_unit": dist_unit, "angle_unit": angle_unit}

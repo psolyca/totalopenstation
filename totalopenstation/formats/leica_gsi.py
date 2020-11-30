@@ -41,7 +41,7 @@ class FormatParser(Parser):
 
     Args:
         data (str): A string representing the file to be parsed.
-            
+
     Attributes:
         line (list): A list of each lines of the file being parsed.
     '''
@@ -52,7 +52,7 @@ class FormatParser(Parser):
     def _get_comments(self):
         """
         Get all comments of the parsed line
-        
+
         Returns:
             A list of comments or an empty list
         """
@@ -68,7 +68,7 @@ class FormatParser(Parser):
     def _get_attrib(self):
         """
         Get all attributes or remarks of the parsed line
-        
+
         Returns:
             A list of attributes and remarks or an empty list
         """
@@ -84,7 +84,7 @@ class FormatParser(Parser):
     def _get_coordinates(self, first_coor, unit):
         """
         Get all coordinates of the parsed line
-        
+
         Args:
             first_coor (str): The Word Index of the first coordinate.
                 Could be 81 or 84
@@ -114,11 +114,11 @@ class FormatParser(Parser):
     def _get_angle(self, angle, unit):
         """
         Get an angle of the parsed line
-        
+
         Returns:
             A floating number representing the angle
             If this angle does not exist, return None
-            
+
         """
         try:
             angle_sign, angle_data = self.tdict[angle]['sign'], self.tdict[angle]['data']
@@ -132,7 +132,7 @@ class FormatParser(Parser):
     def _get_edm_accuracy(self, ldata):
         """
         Get the ppm and the prism constant of the parsed line
-        
+
         Returns:
             Two floating numbers representing ppm and prism constant
             If these values do not exist, return None
@@ -159,7 +159,7 @@ class FormatParser(Parser):
     def _get_value(self, value, unit):
         """
         Get a value of the parsed line
-        
+
         Returns:
             A string value or None
         """
@@ -177,15 +177,15 @@ class FormatParser(Parser):
         '''Extract all GSI data.
 
         This parser is based on the information in :ref:`if_leica_gsi`
-        
+
         Returns:
             A list of GeoJSON-like Feature object representing points coordinates.
-    
+
         Raises:
-            KeyError: An error occured during line read, this line could not be 
+            KeyError: An error occured during line read, this line could not be
                 computed as the WI does not exist.
             KeyError: An error occured during computation, the data does not exist.
-        
+
         Notes:
             Information needed are:
                 - station : 11, 84, 85, 86, 88
@@ -193,7 +193,7 @@ class FormatParser(Parser):
                 - computed point : 11, 21, 22, 31 or 32, 87 [, 88] [, 81, 82, 83]
             Angles are considered as zenithal
         '''
-        
+
         points = []
         bp = None
         for row in self.rows:
@@ -315,16 +315,16 @@ class FormatParser(Parser):
         '''Extract all GSI data.
 
         This parser is based on the information in :ref:`if_leica_gsi`
-        
+
         Returns:
             A list of GeoJSON-like Feature object representing raw data
                 i.e. polar coordinates and other informations.
-    
+
         Raises:
-            KeyError: An error occured during line read, this line could not be 
+            KeyError: An error occured during line read, this line could not be
                 computed as the WI does not exist.
             KeyError: An error occured during computation, the data does not exist.
-        
+
         Notes:
             Information needed are:
                 - station : 11 [, 25], 84, 85, 86 [, 87], 88
@@ -508,4 +508,4 @@ class FormatParser(Parser):
                     points.append(f)
 
         logger.debug(points)
-        return points
+        return points, {"dist_unit": dist_unit, "angle_unit": angle_unit}
