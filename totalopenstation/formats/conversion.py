@@ -21,7 +21,7 @@
 # along with Total Open Station.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from math import sin,cos, pi
+from math import sin, pi, cos
 
 
 def deg_to_gon(angle):
@@ -182,19 +182,6 @@ def to_mil(angle, angle_unit):
     else:
         return deg_to_mil(angle)
 
-
-def vertical_to_zenithal(angle, angle_unit):
-    '''Convert angle from vertical (reference is horizontal) to
-    zenithal (reference is north)'''
-    if angle_unit == "dms":
-        return to_dms(90 - to_deg(angle, angle_unit), "deg")
-    elif angle_unit == "gon" or angle_unit == "grads":
-        return 100 - angle
-    elif angle_unit == "rad":
-        return (pi / 2) - angle
-    else:
-        return 90 - angle
-
 def horizontal_to_slope(dist, angle, angle_unit, angle_type="z"):
     '''Convert distance to slope from horizontal
     Angle is considered zenithal by default'''
@@ -203,3 +190,55 @@ def horizontal_to_slope(dist, angle, angle_unit, angle_type="z"):
         return dist / sin (angle)
     else:
         return dist / cos (angle)
+
+def vertical_to_zenithal(angle, angle_unit):
+    '''Convert angle from vertical (reference is horizontal) to
+    zenithal (reference is north)'''
+    if angle_unit == "deg":
+        return 90 - angle
+    elif angle_unit == "gon" or angle_unit == "grads":
+        return 100 - angle
+    elif angle_unit == "rad":
+        return (pi / 2) - angle
+    elif angle_unit == "mil":
+        return 1600 - angle
+    else:
+        return deg_to_dms(360 - dms_to_deg(angle))
+
+def bearing_to_azimuth(angle, angle_unit):
+    quater = angle[0] + angle[-1]
+    if quater == "NE":
+        return angle
+    if quater == "SE":
+        if angle_unit == "deg":
+            return 180 - angle
+        elif angle_unit == "gon":
+            return 200 - angle
+        elif angle_unit == "rad":
+            return pi - angle
+        elif angle_unit == "mil":
+            return 3200 - angle
+        else:
+            return deg_to_dms(180 - dms_to_deg(angle))
+    if quater == "NW":
+        if angle_unit == "deg":
+            return 360 - angle
+        elif angle_unit == "gon":
+            return 400 - angle
+        elif angle_unit == "rad":
+            return 2 * pi - angle
+        elif angle_unit == "mil":
+            return 6400 - angle
+        else:
+            return deg_to_dms(360 - dms_to_deg(angle))
+    if quater == "SW":
+        if angle_unit == "deg":
+            return 180 + angle
+        elif angle_unit == "gon":
+            return 200 + angle
+        elif angle_unit == "rad":
+            return pi + angle
+        elif angle_unit == "mil":
+            return 3200 + angle
+        else:
+            return deg_to_dms(180 + dms_to_deg(angle))
