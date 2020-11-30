@@ -334,6 +334,7 @@ class FormatParser(Parser):
         '''
 
         points = []
+        stations = {}
         # GSI files handles 8 or 16 bits data block. This will check the size
         ldata = len(self.rows[0].split()[0].lstrip('*')[7:])
         station_id = 1
@@ -376,69 +377,50 @@ class FormatParser(Parser):
                 except IndexError:
                     pass
                 # Beginning of the parsing
-                try:
-                    # Look for a station
-                    x, y, z = self.tdict['84'], self.tdict['85'], self.tdict['86']
-                    ih = self.tdict['88']
-                except KeyError:
-                    # Otherwise look for polar data
-                    try:
-                        angle, z_angle = self.tdict['21'], self.tdict['22']
-                        # 31 or/and 32
-                        try:
-                            dist = self.tdict['31']
-                        except KeyError:
-                            try:
-                                dist = self.tdict['32']
-                            except KeyError:
-                                logger.info('There is no distance value')
-                                dist = None
-                            else:
-                                dist_type = 'h'
-                        else:
-                            dist_type = 's'
-                        th = self.tdict['87']
-                    except KeyError:
-                        # Otherwise look for point coordinates only
-                        try:
-                            x, y, z = self.tdict['81'], self.tdict['82'], self.tdict['83']
-                        except KeyError:
-                            # Otherwise look for Remark or Attrib
-                            try:
-                                attrib = self.tdict['71']
-                            except KeyError:
-                                # No more possibilities
-                                logger.info("These data can not be compute : %s" % (self.tdict))
-                            else:
-                                # Compute remark or Attrib
-                                attrib = self._get_attrib()
-                        else:
-                            # Compute point coordinates
-                            x, y, z = self._get_coordinates("81", UNITS[dist_unit])
-                            # Point coordinates may have remarks or attributes
-                            attrib = self._get_attrib()
+                # Look for a station point
+                x, y, z = self._get_coordinates("84", UNITS[dist_unit])
+                if not None in (x, y, z):
+                    # Compute station point data
+                    ih = self._get_value("88", UNITS[dist_unit])
+                    # Station data may have an azimuth angle
+                    hz0 = self._get_angle("25", UNITS[angle_unit])
+                    # Station data may have remarks or attributes
+                    attrib = self._get_attrib()
 
-                            if x:
-                                p = Point(x, y, z)
-                            else:
-                                logger.info('There is no known point')
-                                p = UNKNOWN_POINT
-                            f = Feature(p,
-                                        desc='PT',
-                                        id=pid,
-                                        point_name=point_name,
-                                        dist_unit=dist_unit,
-                                        attrib=attrib)
-                            points.append(f)
-                    else:
+                    if x:
+                        p = Point(x, y, z)
+                        station_name = point_name
+                    else: # Should not appened !
+                        logger.info('There is no known point')
+                        p = UNKNOWN_STATION
+                        station_name = "station_" + str(station_id)
+                        station_id += 1
+                    f = Feature(p,
+                                desc='ST',
+                                id=pid,
+                                point_name=station_name,
+                                angle_unit=angle_unit,
+                                dist_unit=dist_unit,
+                                ih=ih,
+                                hz0=hz0,
+                                attrib=attrib)
+                    points.append(f)
+                    stations[station_name] = f
+                else:
+                    # Otherwise look for polar data (measurement)
+                    angle = self._get_angle("21", UNITS[angle_unit])
+                    z_angle = self._get_angle("22", UNITS[angle_unit])
+                    if not None in (angle, z_angle):
                         # Compute polar data
-                        angle = self._get_angle("21", UNITS[angle_unit])
-                        z_angle = self._get_angle("22", UNITS[angle_unit])
                         z_angle_type = 'z'
-                        if dist_type == 's':
-                            dist = self._get_value("31", UNITS[dist_unit])
-                        else:
+                        # 31 or/and 32
+                        dist = self._get_value("31", UNITS[dist_unit])
+                        if dist is None:
                             dist = self._get_value("32", UNITS[dist_unit])
+                            if dist is not None :
+                                dist_type = 'h'
+                        else :
+                            dist_type = 's'
                         th = self._get_value("87", UNITS[dist_unit])
                         # Polar data may have point coordinates
                         x, y, z = self._get_coordinates("81",UNITS[dist_unit])
@@ -456,11 +438,22 @@ class FormatParser(Parser):
                             p = UNKNOWN_POINT
 
                         try:
+                            # A station should have been compute before the polar data otherwise no computation possible
                             station_name
                         except UnboundLocalError:
+                            # Creation of a fake station (missing elements !)
                             logger.info('There is no known station')
                             station_name = 'station_' + str(station_id)
                             station_id += 1
+                            stations[station_name] = Feature(UNKNOWN_STATION,
+                                desc='ST',
+                                id=-1,
+                                point_name=station_name,
+                                angle_unit=angle_unit,
+                                dist_unit=dist_unit,
+                                ih=-1,
+                                hz0=-1,
+                                attrib=[])
                         f = Feature(p,
                                     desc='PO',
                                     id=pid,
@@ -477,35 +470,37 @@ class FormatParser(Parser):
                                     ppm=ppm,
                                     prism_constant=prism_constant,
                                     st_name=station_name,
+                                    station=stations[station_name],
                                     attrib=attrib)
                         points.append(f)
-                else:
-                    # Compute station data
-                    x, y, z = self._get_coordinates("84", UNITS[dist_unit])
-                    ih = self._get_value("88", UNITS[dist_unit])
-                    # Station data may have an azimuth angle
-                    hz0 = self._get_angle("25", UNITS[angle_unit])
-                    # Station data may have remarks or attributes
-                    attrib = self._get_attrib()
 
-                    if x:
-                        p = Point(x, y, z)
-                        station_name = point_name
                     else:
-                        logger.info('There is no known station')
-                        p = UNKNOWN_STATION
-                        station_name = "station_" + str(station_id)
-                        station_id += 1
-                    f = Feature(p,
-                                desc='ST',
-                                id=pid,
-                                point_name=point_name,
-                                angle_unit=angle_unit,
-                                dist_unit=dist_unit,
-                                ih=ih,
-                                hz0=hz0,
-                                attrib=attrib)
-                    points.append(f)
+                        # Otherwise look for point coordinates only
+                        x, y, z = self._get_coordinates("81", UNITS[dist_unit])
+                        if not None in (x, y, z):
+                            # Compute point coordinates
+                            x, y, z = self._get_coordinates("81", UNITS[dist_unit])
+                            # Point coordinates may have remarks or attributes
+                            attrib = self._get_attrib()
+
+                            if x:
+                                p = Point(x, y, z)
+                            else:
+                                logger.info('There is no known station')
+                                p = UNKNOWN_POINT
+                            f = Feature(p,
+                                        desc='PT',
+                                        id=pid,
+                                        point_name=point_name,
+                                        dist_unit=dist_unit,
+                                        attrib=attrib)
+                            points.append(f)
+                        else:
+                            # Otherwise look for Remark or Attrib
+                            attrib = self._get_attrib()
+                            if attrib == []:
+                                # No more possibilities
+                                raise KeyError("These data can not be compute.")
 
         logger.debug(points)
         return points, {"dist_unit": dist_unit, "angle_unit": angle_unit}
